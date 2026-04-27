@@ -1,0 +1,33 @@
+name: Build MA12070P Component
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        config:
+          - components/ma12070p/yaml/esp32-idf-media-player.yaml
+          - components/ma12070p/yaml/esp32s3-idf-media-player.yaml
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build with esphome (Docker)
+        uses: docker://ghcr.io/esphome/esphome:latest
+        with:
+          args: compile ${{ matrix.config }}

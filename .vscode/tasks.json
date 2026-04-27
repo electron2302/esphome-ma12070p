@@ -1,0 +1,69 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build MA12070P Component (Local)",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/esphome",
+      "args": [
+        "compile",
+        "components/ma12070p/yaml/esp32-idf-media-player.yaml"
+      ],
+      "env": {
+        "PLATFORMIO_CORE_DIR": "${workspaceFolder}/.platformio"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Run MA12070P Component (Local - esphome run)",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "${workspaceFolder}/.vscode/esphome-run.sh"
+      ],
+      "env": {
+        "PLATFORMIO_CORE_DIR": "${workspaceFolder}/.platformio"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Upload to Device (Local)",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/esphome",
+      "args": [
+        "upload",
+        "components/ma12070p/yaml/esp32-idf-media-player.yaml",
+        "--device",
+        "/dev/tty.usbserial-130"
+      ],
+      "env": {
+        "PLATFORMIO_CORE_DIR": "${workspaceFolder}/.platformio"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    }
+  ]
+}
