@@ -2,6 +2,10 @@
 
 The MA12070P is a high-efficiency Class D audio amplifier with basic DSP capabilities, designed by Merus Audio (Infineon). This ESPHome external component provides integration of the MA12070P with ESP32-based systems, supporting digital volume control, mute, and power management via Home Assistant or ESPHome automations.
 
+# Why
+
+I've created a [Loud-ESP32-Plus](https://sonocotta.com/loud-esp32/) board, that uses this DAC, and I wanted to integrate this DAC into the Home Assistant. Even though it is discontinued by Infineon, they didn't really provide a comparable alternative. So while they are still in stock, why would I not use it 
+
 ## Usage: MA12070P Component from GitHub
 
 This component requires ESPHome version 2026.4.0 or later and **ESP-IDF framework only** (Arduino framework is not supported).
@@ -214,6 +218,6 @@ This component is licensed under GPLv3.
 
 ## References
 
-- [Infineon MA12070P Product Page](https://www.infineon.com/cms/en/product/power/motor-control-ics/audio-ics/ma12070p/)
+- [Infineon MA12070P Product Page](https://www.infineon.com/part/MA12070P)
 - [ESPHome Audio DAC Component](https://esphome.io/components/audio_dac/)
 - [ESPHome I2S Audio Speaker](https://esphome.io/components/speaker/i2s_audio/)
