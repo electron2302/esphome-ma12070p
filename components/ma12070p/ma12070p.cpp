@@ -20,28 +20,38 @@ namespace esphome
       if (this->enable_pin_ != nullptr)
       {
         this->enable_pin_->setup();
-        this->enable_pin_->digital_write(true); // default to power off until setup complete
+        this->enable_pin_->digital_write(false); // LOW = active (device on for I2C config)
       }
 
       if (this->mute_pin_ != nullptr)
       {
         this->mute_pin_->setup();
-        this->mute_pin_->digital_write(false); // default to muted until setup complete
+        this->mute_pin_->digital_write(false); // LOW = muted until setup complete
       }
+
+      // rescale configured dB range to register values (0x00=+24dB, 0x18=0dB, 0xA8=-144dB, step=-1dB/LSB)
+      // raw = 24 - db  (e.g. 0dB -> 0x18=24, -60dB -> 0x54=84)
+      this->ma12070p_state_.raw_volume_max = (uint8_t)(24 - this->ma12070p_state_.volume_max);
+      this->ma12070p_state_.raw_volume_min = (uint8_t)(24 - this->ma12070p_state_.volume_min);
+      this->ma12070p_state_.raw_volume_current = this->ma12070p_state_.raw_volume_max; // start at max volume
 
       if (!configure_registers_())
       {
         this->error_code_ = CONFIGURATION_FAILED;
         this->mark_failed();
       }
-
-      // TODO: readjust scaler for MA12060P which has a different volume range
-      // rescale -103db to 24db digital volume range to register digital volume range 254 to 0
-      this->ma12070p_state_.raw_volume_max = (uint8_t)((this->ma12070p_state_.volume_max - 24) * -2);
-      this->ma12070p_state_.raw_volume_min = (uint8_t)((this->ma12070p_state_.volume_min - 24) * -2);
     }
 
     bool Ma12070Component::configure_registers_()
+    {
+      if (!this->set_deep_sleep_off_())
+        return false;
+
+      this->start_time_ = millis();
+      return true;
+    }
+
+    bool Ma12070Component::write_init_seq_()
     {
       uint16_t i = 0;
       uint16_t counter = 0;
@@ -65,11 +75,54 @@ namespace esphome
         i++;
       }
       this->number_registers_configured_ = counter;
+      return true;
+    }
 
-      if (!this->set_deep_sleep_off_())
+    bool Ma12070Component::set_deep_sleep_off_()
+    {
+      ESP_LOGD(TAG, "Exiting power down mode");
+      // save mute state before touching the pin
+      bool was_muted = this->is_muted_;
+
+      // Mute before restarting the DAC
+      if (this->mute_pin_ != nullptr)
+        this->mute_pin_->digital_write(false); // LOW = muted during power up, will be restored to pre-sleep state at the end of this function
+
+      if (this->enable_pin_ != nullptr)
+      {
+        this->enable_pin_->digital_write(false); // LOW = active
+        delay(100);                              // wait for PVDD to stabilize
+      }
+
+      // DAC lost all settings while in reset — re-send init sequence
+      if (!this->write_init_seq_())
         return false;
 
-      this->start_time_ = millis();
+      // restore volume (register was cleared by reset)
+      if (!this->set_digital_volume_(this->ma12070p_state_.raw_volume_current))
+        return false;
+      
+      // restore mute pin to its pre-sleep state
+      if (this->mute_pin_ != nullptr)
+        this->mute_pin_->digital_write(!was_muted); // HIGH = unmuted, LOW = muted
+      this->is_muted_ = was_muted;
+      
+      this->ma12070p_state_.control_state = STATE_RUNNING;
+      return true;
+    }
+
+    bool Ma12070Component::set_deep_sleep_on_()
+    {
+      ESP_LOGD(TAG, "Entering power down mode");
+      if (this->enable_pin_ != nullptr)
+        this->enable_pin_->digital_write(true); // HIGH = reset/inactive
+      this->ma12070p_state_.control_state = STATE_IDLE;
+      return true;
+    }
+
+    bool Ma12070Component::set_state_(ControlState state)
+    {
+      this->ma12070p_state_.control_state = state;
       return true;
     }
 
@@ -98,10 +151,11 @@ namespace esphome
                       "  Registers configured: %i\n"
                       "  Maximum Volume: %idB\n"
                       "  Minimum Volume: %idB\n"
-  
+                      "  Debug mode: %s",
                       this->number_registers_configured_,
                       this->ma12070p_state_.volume_max,
-                      this->ma12070p_state_.volume_min
+                      this->ma12070p_state_.volume_min,
+                      this->debug_mode_ ? "enabled" : "disabled"
         );
         LOG_UPDATE_INTERVAL(this);
         break;
@@ -111,32 +165,27 @@ namespace esphome
     // public
     void Ma12070Component::enable_dac(bool enable)
     {
-      // TODO: implement power on/off using Mute pin
+      if (enable)
+        set_deep_sleep_off_();
+      else
+        set_deep_sleep_on_();
     }
 
     bool Ma12070Component::set_mute_off()
     {
-      ESP_LOGD(TAG, "Mute OFF entered");
-      if (!this->is_muted_)
-        return true;
-
-      // TODO: implement mute on/off using Mute pin
-
+      ESP_LOGD(TAG, "Mute OFF");
+      if (this->mute_pin_ != nullptr)
+        this->mute_pin_->digital_write(true); // HIGH = unmuted (playing)
       this->is_muted_ = false;
-      ESP_LOGD(TAG, "Mute OFF done");
       return true;
     }
 
     bool Ma12070Component::set_mute_on()
     {
-      ESP_LOGD(TAG, "Mute ON entered");
-      if (this->is_muted_)
-        return true;
-
-      // TODO: implement mute on/off using Mute pin
-
+      ESP_LOGD(TAG, "Mute ON");
+      if (this->mute_pin_ != nullptr)
+        this->mute_pin_->digital_write(false); // LOW = muted
       this->is_muted_ = true;
-      ESP_LOGD(TAG, "Mute ON done");
       return true;
     }
 
@@ -159,32 +208,26 @@ namespace esphome
       if (!this->set_digital_volume_(raw_volume))
         return false;
 
-      int8_t dB = -(raw_volume / 2) + 24;
+      int8_t dB = 24 - (int8_t)raw_volume;
       ESP_LOGD(TAG, "Volume: %idB", dB);
       return true;
     }
 
     bool Ma12070Component::get_digital_volume_(uint8_t *raw_volume)
     {
-      uint8_t current = 254; // lowest raw volume
-      if (!this->ma12070p_read_byte_(MA12070P_REG_VOL_L, &current))
+      uint8_t current = 0xA8; // lowest raw volume (-144dB)
+      if (!this->ma12070p_read_byte_(MA12070P_REG_VOL, &current))
         return false;
       *raw_volume = current;
       return true;
     }
 
-    // controls both left and right channel digital volume
-    // digital volume is 24 dB to -103 dB in -0.5 dB step
-    // 00000000: +24.0 dB
-    // 00000001: +23.5 dB
-    // 00101111: +0.5 dB
-    // 00110000: 0.0 dB
-    // 00110001: -0.5 dB
-    // 11111110: -103 dB
-    // 11111111: Mute
+    // master volume register: 0x00=+24dB, 0x18=0dB, 0xA8=-144dB, step=-1dB/LSB
     bool Ma12070Component::set_digital_volume_(uint8_t raw_volume)
     {
-      // TODO: implement volume register
+      if (!this->ma12070p_write_byte_(MA12070P_REG_VOL, raw_volume))
+        return false;
+      this->ma12070p_state_.raw_volume_current = raw_volume;
       return true;
     }
 
@@ -216,6 +259,11 @@ namespace esphome
         this->i2c_error_ = (uint8_t)error_code;
         return false;
       }
+      if (this->debug_mode_)
+      {
+        for (uint8_t i = 0; i < number_bytes; i++)
+          ESP_LOGD(TAG, "I2C RD reg=0x%02X val=0x%02X", a_register + i, data[i]);
+      }
       return true;
     }
 
@@ -226,6 +274,11 @@ namespace esphome
 
     bool Ma12070Component::ma12070p_write_bytes_(uint8_t a_register, uint8_t *data, uint8_t len)
     {
+      if (this->debug_mode_)
+      {
+        for (uint8_t i = 0; i < len; i++)
+          ESP_LOGD(TAG, "I2C WR reg=0x%02X val=0x%02X", a_register + i, data[i]);
+      }
       i2c::ErrorCode error_code = this->write_register(a_register, data, len);
       if (error_code != i2c::ERROR_OK)
       {

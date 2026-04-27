@@ -4,10 +4,12 @@ from esphome.components import i2c
 from esphome.components.audio_dac import AudioDac
 from esphome import pins
 
+CONF_MUTE_PIN = "mute_pin"
+
 from esphome.const import (
     CONF_ID,
     CONF_ENABLE_PIN,
-    CONF_MUTE_PIN
+    CONF_DEBUG,
 )
 
 CODEOWNERS = ["@sonocotta"]
@@ -44,12 +46,12 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_VOLUME_MIN, default="-103dB"): cv.All(
                         cv.decibel, cv.int_range(-144, 24)
             ),
+            cv.Optional(CONF_DEBUG, default=False): cv.boolean,
         }
     )
     .extend(cv.polling_component_schema("1s"))
-    .extend(i2c.i2c_device_schema(0x2D))
+    .extend(i2c.i2c_device_schema(0x20))
     .add_extra(validate_config),
-    cv.only_with_esp_idf,
     cv.only_on_esp32,
 )
 
@@ -68,3 +70,4 @@ async def to_code(config):
     
     cg.add(var.config_volume_max(config[CONF_VOLUME_MAX]))
     cg.add(var.config_volume_min(config[CONF_VOLUME_MIN]))
+    cg.add(var.set_debug_mode(config[CONF_DEBUG]))

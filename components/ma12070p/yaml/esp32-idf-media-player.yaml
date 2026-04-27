@@ -1,7 +1,11 @@
+substitutions:
+  name: esphome-web-000000
+  friendly_name: Loud-ESP32-Plus
+
 esphome:
-  name: hifi-esp32-plus
-  friendly_name: HiFi-ESP32-Plus
-  min_version: 2025.7.2
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2026.4.1
   platformio_options:
     board_build.flash_mode: dio
 
@@ -61,12 +65,10 @@ i2c:
 audio_dac:
   - platform: ma12070p
     id: ma12070p_dac
-    enable_pin: GPIO13      # optional, to enable/disable the DAC (XSMT pin)
+    enable_pin: GPIOXX      # ENABLE, When pulled high, the device is reset and kept in an inactive state with minimum power consumption.
+    mute_pin: GPIOXX        # MUTE, Mute audio output when pulled low
     volume_max: 0dB         # maximum volume range 0dB, can go up to +24dB
-    volume_min: -60dB       # minimum volume range -60dB, can go down to -103dB
-    analog_gain: -6dB       # or -6Db for 1V RMS output, default is 0dB = 2V RMS output
-    mixer_mode: STEREO      # MIXER MODE: STEREO, STEREO_INVERSE, LEFT, RIGHT
-
+    volume_min: -60dB       # minimum volume range -60dB, can go down to -144dB
 i2s_audio:
   i2s_lrclk_pin: GPIO25
   i2s_bclk_pin: GPIO26
@@ -79,6 +81,7 @@ speaker:
     audio_dac: ma12070p_dac
     channel: stereo
     sample_rate: 48000
+    bits_per_sample: 32bit    # MA12070P requires 32-bit I2S slot width (64 BCLK/frame)
     timeout: never
 
   - platform: mixer
@@ -101,7 +104,7 @@ speaker:
 media_player:
   - platform: speaker
     name: Mediaplayer
-    id: hifi_mediaplayer
+    id: loud_mediaplayer
     buffer_size: 100000
     volume_increment: 10%
     volume_initial: 10%
@@ -151,6 +154,11 @@ switch:
     enable_dac:
       name: Enable DAC
       id: enable_dac
+      restore_mode: ALWAYS_OFF
+
+    mute:
+      name: Mute
+      id: mute
       restore_mode: ALWAYS_ON
 
 number:
@@ -176,7 +184,7 @@ interval:
                 time: 120s
                 condition:
                   or:
-                    - media_player.is_idle: hifi_mediaplayer
-                    - media_player.is_paused: hifi_mediaplayer
+                    - media_player.is_idle: loud_mediaplayer
+                    - media_player.is_paused: loud_mediaplayer
           then:
             - switch.turn_off: enable_dac

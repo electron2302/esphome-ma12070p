@@ -37,13 +37,18 @@ namespace esphome
 
       void config_volume_max(float volume_max) {this->ma12070p_state_.volume_max = (int8_t)(volume_max); }
       void config_volume_min(float volume_min) {this->ma12070p_state_.volume_min = (int8_t)(volume_min); }
+      void set_debug_mode(bool debug) { this->debug_mode_ = debug; }
 
     protected:
 
+      enum ControlState { STATE_IDLE = 0, STATE_RUNNING };
+
       GPIOPin *enable_pin_{nullptr};
       GPIOPin *mute_pin_{nullptr};
+      bool is_muted_{false};
 
       bool configure_registers_();
+      bool write_init_seq_();
 
       bool set_deep_sleep_off_();
       bool set_deep_sleep_on_();
@@ -71,10 +76,13 @@ namespace esphome
         int8_t volume_min = -60;   // configured by YAML, default -60dB
         uint8_t raw_volume_max;     // initialised in setup
         uint8_t raw_volume_min;     // initialised in setup
+        uint8_t raw_volume_current; // last written value, restored after deep sleep
+        ControlState control_state{STATE_IDLE};
       } ma12070p_state_;
 
       uint8_t i2c_error_{0};
       uint8_t loop_counter_{0};
+      bool debug_mode_{false};
 
       uint16_t count_fast_updates_{0};
 

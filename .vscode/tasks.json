@@ -7,7 +7,7 @@
       "command": "${workspaceFolder}/.venv/bin/esphome",
       "args": [
         "compile",
-        "components/ma12070p/yaml/esp32-idf-media-player.yaml"
+        "components/ma12070p/yaml/${fileBasename}"
       ],
       "env": {
         "PLATFORMIO_CORE_DIR": "${workspaceFolder}/.platformio"
@@ -49,9 +49,31 @@
       "command": "${workspaceFolder}/.venv/bin/esphome",
       "args": [
         "upload",
-        "components/ma12070p/yaml/esp32-idf-media-player.yaml",
+        "components/ma12070p/yaml/${fileBasename}",
         "--device",
         "/dev/tty.usbserial-130"
+      ],
+      "env": {
+        "PLATFORMIO_CORE_DIR": "${workspaceFolder}/.platformio"
+      },
+      "group": "build",
+      "problemMatcher": [],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Build and Upload to Device (OTA)",
+      "type": "shell",
+      "command": "${workspaceFolder}/.venv/bin/esphome",
+      "args": [
+        "run",
+        "components/ma12070p/yaml/${fileBasename}",
+        "--device",
+        "OTA"
       ],
       "env": {
         "PLATFORMIO_CORE_DIR": "${workspaceFolder}/.platformio"

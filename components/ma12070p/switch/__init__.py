@@ -4,10 +4,12 @@ import esphome.config_validation as cv
 from esphome.const import DEVICE_CLASS_SWITCH
 
 CONF_ENABLE_DAC = "enable_dac"
+CONF_MUTE = "mute"
 
 from ..audio_dac import CONF_MA12070P_ID, Ma12070Component, ma12070p_ns
 
 EnableDacSwitch = ma12070p_ns.class_("EnableDacSwitch", switch.Switch, cg.Component)
+MuteSwitch = ma12070p_ns.class_("MuteSwitch", switch.Switch, cg.Component)
 
 CONFIG_SCHEMA = cv.Schema(
     {
@@ -17,7 +19,13 @@ CONFIG_SCHEMA = cv.Schema(
             EnableDacSwitch,
             device_class=DEVICE_CLASS_SWITCH,
         )
-        .extend(cv.COMPONENT_SCHEMA)
+        .extend(cv.COMPONENT_SCHEMA),
+
+        cv.Optional(CONF_MUTE): switch.switch_schema(
+            MuteSwitch,
+            device_class=DEVICE_CLASS_SWITCH,
+        )
+        .extend(cv.COMPONENT_SCHEMA),
     }
 )
 
@@ -26,5 +34,9 @@ async def to_code(config):
   if enable_dac_config := config.get(CONF_ENABLE_DAC):
     s = await switch.new_switch(enable_dac_config)
     await cg.register_component(s, enable_dac_config)
+    await cg.register_parented(s, ma12070p_component)
+  if mute_config := config.get(CONF_MUTE):
+    s = await switch.new_switch(mute_config)
+    await cg.register_component(s, mute_config)
     await cg.register_parented(s, ma12070p_component)
 
