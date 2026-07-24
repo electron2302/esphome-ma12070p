@@ -280,6 +280,7 @@ namespace esphome
           ESP_LOGD(TAG, "I2C WR reg=0x%02X val=0x%02X", a_register + i, data[i]);
       }
       i2c::ErrorCode error_code = this->write_register(a_register, data, len);
+      delay(2);
       if (error_code != i2c::ERROR_OK)
       {
         ESP_LOGE(TAG, "Write error: %i", error_code);
