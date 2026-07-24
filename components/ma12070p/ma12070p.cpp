@@ -225,6 +225,12 @@ namespace esphome
     // master volume register: 0x00=+24dB, 0x18=0dB, 0xA8=-144dB, step=-1dB/LSB
     bool Ma12070Component::set_digital_volume_(uint8_t raw_volume)
     {
+      // Dummy read to wake the I2C bus — first transaction always times out
+      uint8_t dummy;
+      this->ma12070p_read_byte_(MA12070P_REG_VOL, &dummy);
+      delay(5);
+      
+      // Now the real write
       if (!this->ma12070p_write_byte_(MA12070P_REG_VOL, raw_volume))
         return false;
       this->ma12070p_state_.raw_volume_current = raw_volume;
@@ -280,7 +286,6 @@ namespace esphome
           ESP_LOGD(TAG, "I2C WR reg=0x%02X val=0x%02X", a_register + i, data[i]);
       }
       i2c::ErrorCode error_code = this->write_register(a_register, data, len);
-      delay(2);
       if (error_code != i2c::ERROR_OK)
       {
         ESP_LOGE(TAG, "Write error: %i", error_code);
